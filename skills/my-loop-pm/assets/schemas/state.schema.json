@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "my-loop v3 · state.json",
+  "type": "object",
+  "required": ["phase", "task", "classification", "current_ticket"],
+  "additionalProperties": false,
+  "properties": {
+    "phase": { "enum": ["idle", "align", "build", "review", "awaiting_acceptance", "done"] },
+    "task": { "type": ["string", "null"], "description": "当前变更一句话" },
+    "classification": { "enum": ["simple", "medium", "big", "bug", null] },
+    "current_ticket": { "type": ["string", "null"], "description": "WIP=1：同一时刻至多一条" },
+    "harness": {
+      "type": ["object", "null"],
+      "description": "人上次选的模型/kind，沿用直到人换",
+      "additionalProperties": false,
+      "properties": {
+        "docs_model": { "type": "string" },
+        "build_kind": { "type": "string" },
+        "review_kind": { "type": "string" }
+      }
+    },
+    "updated": { "type": ["string", "null"], "description": "YYYY-MM-DD" }
+  }
+}

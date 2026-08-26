@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "my-loop v3 · decisions.jsonl 每行一条决策",
+  "type": "object",
+  "required": ["id", "decision", "reason", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^D-\\d{3,}$" },
+    "date": { "type": "string", "description": "YYYY-MM-DD" },
+    "decision": { "type": "string", "description": "一句话：定了什么 + 别做什么" },
+    "reason": { "type": "string", "description": "为什么。少了它，下次会被当成口味偏好绕开" },
+    "rejected": { "type": "string", "description": "否决过什么方案、为什么——防下个会话把它重新发明出来（决策反转）" },
+    "guard": {
+      "type": "object",
+      "description": "这条靠什么防住被无意改回去。doc/none = 裸奔，最容易被下次会话推翻",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["structure", "test", "doc", "none"] },
+        "ref": { "type": "string", "description": "文件:行号" }
+      }
+    },
+    "scope": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "域标签，用于派工时挑「相关决策给全文」。缺省 = 全局，永远全文注入"
+    },
+    "status": { "enum": ["active", "superseded"] },
+    "superseded_by": { "type": ["string", "null"], "description": "被哪条取代。要推翻就新起一条，旧条标 superseded" }
+  }
+}
