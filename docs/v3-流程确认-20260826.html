@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>my-loop v3 · V0.1 流程确认稿</title>
+<style>
+  :root {
+    --bg: #FAFAF7;
+    --card: #FFFFFF;
+    --ink: #22272C;
+    --muted: #6E7680;
+    --line: #E4E4DC;
+    --human: #BF3F2A;
+    --human-soft: #FBEFEC;
+    --ai: #3D5A80;
+    --ai-soft: #EDF1F6;
+    --file: #8A7B4F;
+    --file-soft: #F5F1E4;
+    --code-bg: #F1F1EA;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181D;
+      --card: #1D2127;
+      --ink: #E7E5E0;
+      --muted: #9AA1A9;
+      --line: #2C313A;
+      --human: #E06749;
+      --human-soft: #33231F;
+      --ai: #85A8CC;
+      --ai-soft: #212B38;
+      --file: #C0AD72;
+      --file-soft: #2B2820;
+      --code-bg: #23272E;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    font-size: 15px;
+    line-height: 1.75;
+    padding: 48px 24px 80px;
+  }
+  .page { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+
+  h1, h2, .phase-name {
+    font-family: "Songti SC", "Noto Serif SC", "Noto Serif CJK SC", serif;
+    text-wrap: balance;
+  }
+  h1 { font-size: 30px; font-weight: 900; line-height: 1.3; }
+  h2 { font-size: 20px; font-weight: 900; margin-bottom: 4px; }
+
+  header .eyebrow {
+    font-size: 12.5px; letter-spacing: .18em; color: var(--muted);
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+  header .motto {
+    margin-top: 14px; font-size: 16.5px;
+    font-family: "Songti SC", "Noto Serif SC", serif; font-weight: 700;
+  }
+  header .motto span { color: var(--human); }
+  header p.sub { margin-top: 10px; color: var(--muted); max-width: 40em; }
+
+  /* 图例 */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 13px; color: var(--muted); }
+  .legend > div { display: flex; align-items: center; gap: 8px; }
+
+  /* 「人」章 */
+  .seal {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; flex: none;
+    border: 1.5px solid var(--human); border-radius: 4px;
+    color: var(--human); font-size: 12px; font-weight: 700;
+    font-family: "Songti SC", serif;
+    background: var(--human-soft);
+  }
+  .chip {
+    display: inline-block; padding: 1px 8px; border-radius: 3px;
+    font-size: 12px; font-family: "SF Mono", Menlo, monospace;
+    background: var(--ai-soft); color: var(--ai); border: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .chip.file { background: var(--file-soft); color: var(--file); }
+  code {
+    font-family: "SF Mono", Menlo, monospace; font-size: 12.5px;
+    background: var(--code-bg); padding: 1px 6px; border-radius: 3px;
+  }
+
+  /* 流程主线 */
+  .flow { display: flex; flex-direction: column; }
+  .gate, .phase {
+    border: 1px solid var(--line); background: var(--card);
+    border-radius: 8px; padding: 20px 24px;
+  }
+  .connector {
+    width: 2px; height: 26px; margin-left: 43px;
+    background: var(--line);
+  }
+  .phase-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+  .phase-no {
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+    color: var(--muted); letter-spacing: .1em; flex: none;
+  }
+  .phase-name { font-size: 19px; font-weight: 900; }
+  .phase-name small { font-weight: 400; color: var(--muted); font-size: 13px; font-family: -apple-system, "PingFang SC", sans-serif; margin-left: 8px; }
+  .who { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+  .phase ul { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .phase ul li { padding-left: 16px; position: relative; }
+  .phase ul li::before {
+    content: ""; position: absolute; left: 2px; top: .72em;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--muted); opacity: .55;
+  }
+  .phase ul li.human::before { display: none; }
+  .phase ul li.human {
+    padding: 8px 12px 8px 12px; margin: 2px 0;
+    background: var(--human-soft); border-left: 3px solid var(--human);
+    border-radius: 0 5px 5px 0;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .phase ul li.human .seal { margin-top: 3px; }
+
+  .outputs {
+    margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line);
+    font-size: 13.5px; color: var(--muted); display: flex; flex-direction: column; gap: 4px;
+  }
+  .outputs b { color: var(--ink); font-weight: 600; }
+
+  /* 终点：验收 */
+  .phase.final { border: 1.5px solid var(--human); }
+  .phase.final .phase-name { color: var(--human); }
+
+  /* 贯穿带 */
+  .threads { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .thread {
+    border: 1px solid var(--line); border-radius: 8px; background: var(--card);
+    padding: 14px 18px; font-size: 13.5px;
+  }
+  .thread b { display: block; margin-bottom: 4px; font-size: 14px; }
+  .thread span { color: var(--muted); }
+
+  /* 双栏对照 */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .col {
+    border: 1px solid var(--line); border-radius: 8px; background: var(--card); padding: 18px 22px;
+  }
+  .col h3 { font-size: 14.5px; margin-bottom: 10px; font-weight: 700; }
+  .col.mine h3 { color: var(--human); }
+  .col.v2 h3 { color: var(--ai); }
+  .col ol { padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+  .col ol li::marker { color: var(--muted); font-family: "SF Mono", Menlo, monospace; font-size: 11.5px; }
+  .col .why { color: var(--muted); }
+
+  /* 文件清单 */
+  .files { border: 1px solid var(--line); border-radius: 8px; background: var(--card); overflow: hidden; }
+  .files .row {
+    display: grid; grid-template-columns: 220px 1fr; gap: 16px;
+    padding: 10px 22px; font-size: 13.5px;
+    border-top: 1px solid var(--line);
+  }
+  .files .row:first-child { border-top: none; }
+  .files .row .desc { color: var(--muted); }
+
+  /* 不做清单 */
+  .not-doing { display: flex; flex-wrap: wrap; gap: 8px; }
+  .not-doing span {
+    padding: 4px 12px; border: 1px dashed var(--line); border-radius: 5px;
+    font-size: 13px; color: var(--muted); text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--muted) 55%, transparent);
+  }
+
+  /* 确认清单 */
+  .confirm {
+    border: 1.5px solid var(--ink); border-radius: 8px; background: var(--card); padding: 22px 26px;
+  }
+  .confirm ol { padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
+  .confirm .ask { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); font-weight: 600; }
+
+  footer { font-size: 12.5px; color: var(--muted); text-align: center; }
+
+  section > .section-cap { font-size: 12.5px; letter-spacing: .15em; color: var(--muted); margin-bottom: 12px; }
+
+  @media (max-width: 640px) {
+    .threads, .cols { grid-template-columns: 1fr; }
+    .files .row { grid-template-columns: 1fr; gap: 2px; }
+    .who { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="eyebrow">MY-LOOP V3 · V0.1 · 2026-08-26</div>
+    <h1>流程确认稿：你手动触发的四个阶段</h1>
+    <div class="motto">流程全 · 思想全 · <span>实现薄</span></div>
+    <p class="sub">v2 的脑子原封不动，换个身体：所有规矩写在文件和提示词里，会话的开、切、关交给 Herdr 和你的手。第一版<b>一行调度代码都不写</b>。</p>
+  </header>
+
+  <section class="legend">
+    <div><span class="seal">人</span>需要你出现的时刻（除此之外都不打扰你）</div>
+    <div><span class="chip">AI 会话</span>在 Herdr 里开的模型会话</div>
+    <div><span class="chip file">文件</span>落在项目 <code>.my-loop/</code> 里的东西</div>
+  </section>
+
+  <section class="flow">
+
+    <div class="gate">
+      <div class="phase-head">
+        <span class="phase-no">进门前</span>
+        <span class="phase-name">先掂量这事多大<small>v2 老规矩，不变</small></span>
+      </div>
+      <ul>
+        <li><b>小事</b>（改一行文案、改个常量，出错也不影响别人）：<b>不进 my-loop</b>，直接改完说一声。</li>
+        <li>会影响别人的事，才走下面四个阶段。判断口径就一句：<b>这事做错了，最坏会怎样？</b></li>
+      </ul>
+    </div>
+
+    <div class="connector"></div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <span class="phase-no">阶段 0</span>
+        <span class="phase-name">init<small>每个项目只做一次</small></span>
+        <span class="who"><span class="chip">Claude</span></span>
+      </div>
+      <ul>
+        <li>在项目里铺好 <code>.my-loop/</code> 协议文件（清单见下文）。</li>
+        <li>找到「启动 / 测试 / 验证」三条命令，<b>各真跑一遍</b>，写进项目说明。跑不通不算装完。</li>
+        <li>不掺一行业务代码。</li>
+      </ul>
+      <div class="outputs"><div><b>产出：</b>一个换谁来都能接手的空工作面。</div><div><b>找你：</b>装完告诉你一声，就完了。</div></div>
+    </div>
+
+    <div class="connector"></div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <span class="phase-no">阶段 1</span>
+        <span class="phase-name">align 对齐<small>人参与最多的一段</small></span>
+        <span class="who"><span class="chip">Fable 对齐</span><span class="chip">Opus 写文档</span></span>
+      </div>
+      <ul>
+        <li>你用大白话说需求。强模型读项目、读决策表，然后<b>用人话追问</b>：没说清的、边界在哪、你可能没想到的风险。</li>
+        <li class="human"><span class="seal">人</span><span>它复述一遍理解 → <b>你说「理解对了」才往下走</b>，不设例外。这一步押的是最贵的错误：方向做错了。</span></li>
+        <li>定大小：<b>简单</b> → 对齐完直接做，不写文档；<b>中等 / 大</b> → 继续往下。</li>
+        <li>Opus 写文档：<b>只更新这次真正涉及的</b>；接口约定收在一个文件里，不拆。</li>
+        <li>拆任务清单 <code>tickets.json</code>：每条任务做完，<b>你能亲眼看到一个变化</b>；每条自带「拿什么验」。</li>
+        <li class="human"><span class="seal">人</span><span><b>反例表</b>：这个设计在什么输入下会塌（极端值 / 两人同时操作、断网重试 / 上游挂了）——每条<b>由你当场拍</b>：挡住，还是接受。实验证明：没人在场时 AI 一律选「接受」。</span></li>
+      </ul>
+      <div class="outputs"><div><b>产出：</b>brief（目标 + 验收标准 + 明确不做 + 反例表）、文档、<code>tickets.json</code>、<code>state.json</code>。</div><div><b>找你：</b>两次，同一场坐完（点头 + 拍反例）。</div></div>
+    </div>
+
+    <div class="connector"></div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <span class="phase-no">阶段 2</span>
+        <span class="phase-name">build 快速实现</span>
+        <span class="who"><span class="chip">Herdr → agy</span></span>
+      </div>
+      <ul>
+        <li>你在 Herdr 里拉起 agy（快模型），按清单顺序干活，<b>同一时刻只做一条</b>。</li>
+        <li>它读四样：这条任务 + 相关文档 + 施工规矩（constitution）+ 相关决策（相关的给全文，其余给一行标题，保证没有决策彻底看不见）。</li>
+        <li>施工规矩的核心：<b>最简单的正确实现</b>；不顺手多做；不为「以后可能要」写代码；每条测试写清「测什么、怎么才会红」。</li>
+        <li><b>完成的定义：贴出验收命令的真实运行输出。</b>没输出不算完成；验不了的老实写「没法验」，不许混进完成里。</li>
+        <li>状态随做随写回 <code>state.json</code> —— 断了会话、换了模型，照着文件就能接上。</li>
+        <li class="human"><span class="seal">人</span><span>只有两种情况找你：<b>撞上已拍板的决策</b>，或<b>同一个错连改两轮还不行</b>。用人话把选项和代价摆给你，你拍板，记进决策表，继续。</span></li>
+      </ul>
+      <div class="outputs"><div><b>产出：</b>代码 + 每条任务的输出证据 + 更新后的进度。</div><div><b>找你：</b>顺利的话 0 次。</div></div>
+    </div>
+
+    <div class="connector"></div>
+
+    <div class="phase">
+      <div class="phase-head">
+        <span class="phase-no">阶段 3</span>
+        <span class="phase-name">review 强审</span>
+        <span class="who"><span class="chip">Herdr → 全新会话（GPT‑5.6 Sol / Opus）</span></span>
+      </div>
+      <ul>
+        <li>你在 Herdr 拉一个<b>全新</b>的强模型会话——它没看过施工过程，只看结果：原始需求、brief、文档、决策表、代码改动、测试输出。</li>
+        <li><b>查代码</b>：需求做对没有、有没有越界多做、有没有过度设计、异常和并发处理。外加一手<b>抽查测试是不是真的在测</b>：把实现故意改坏一处，看测试红不红。优先抽 worker 自己报的「最没把握的地方」。</li>
+        <li><b>跑系统</b>：集成、回归、端到端，把页面/产物<b>真的打开看一眼</b>。</li>
+        <li>小毛病它顺手修掉，但<b>每一笔修改都记录在案</b>，报告里单独列出——你验收时优先看这里（防它既当运动员又当裁判）。</li>
+        <li class="human"><span class="seal">人</span><span>大问题（需求理解错了 / 要改约定 / 方向冲突）→ 用人话找你定夺。</span></li>
+      </ul>
+      <div class="outputs"><div><b>产出：</b>一份人话报告：<b>第一句就是结论</b>，然后验收标准逐条（过 / 没过 / 没法验）+ 原始输出在哪。</div></div>
+    </div>
+
+    <div class="connector"></div>
+
+    <div class="phase final">
+      <div class="phase-head">
+        <span class="phase-no">终点</span>
+        <span class="phase-name">你亲手验收 → 才收尾</span>
+        <span class="who"><span class="seal">人</span></span>
+      </div>
+      <ul>
+        <li class="human"><span class="seal">人</span><span>你拿着报告，<b>打开真实产物看一眼，亲手跑一遍关键操作</b>。不满意 → 打回去修。</span></li>
+        <li><b>你点头之前，谁也不许删东西。</b>点头之后才收尾：</li>
+        <li><b>沉淀</b>：重要决策写进决策表（带「靠什么防住被改回去」和「否决过什么、为什么」）；有长期价值的文档转正。</li>
+        <li><b>清理</b>：临时文件、施工产物、用完的任务清单，清干净。</li>
+        <li><b>ELI5 总结</b>：这次解决了什么 / 以前怎样 / 现在怎样 / 关键决策是什么 / 还剩什么风险。</li>
+      </ul>
+    </div>
+
+  </section>
+
+  <section>
+    <div class="section-cap">两条线贯穿全程</div>
+    <div class="threads">
+      <div class="thread"><b>决策表贯穿</b><span>对齐时读它 → 施工撞上它就停 → 审查拿它对 → 收尾写回它。新会话、新模型进来，第一件事就是读到它。</span></div>
+      <div class="thread"><b>ELI5 贯穿</b><span>所有找你说话的地方——追问、卡住、报告、总结——一律说人话，第一句先给结论，不许堆黑话。</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-cap">这一版里，哪些是你拍的、哪些是我补的</div>
+    <div class="cols">
+      <div class="col mine">
+        <h3>你拍的板</h3>
+        <ol>
+          <li>决策表用 JSONL，加两个字段：<span class="why">靠什么防住被改回去 / 当时否决过什么、为什么</span></li>
+          <li>进度文件直接上 JSON<span class="why">（老项目先留 md）</span></li>
+          <li>Herdr 第一天进体系，你手动开、切会话</li>
+          <li>四个阶段全部你手动触发：init / align / build / review</li>
+          <li>Opus 写文档 → agy 实现 → 全新会话强审</li>
+          <li>ELI5、KISS 贯穿；流程全、思想全、实现薄</li>
+          <li>你验收通过，才允许收尾清理</li>
+        </ol>
+      </div>
+      <div class="col v2">
+        <h3>我从 v2 补回的防线（都有踩坑或实验背书）</h3>
+        <ol>
+          <li>先分级再进门，小事不进流程<span class="why">——防你哪天嫌烦绕开它</span></li>
+          <li>完成 = 贴真实输出<span class="why">——防 AI 谎报完成，坏地基传染下游任务</span></li>
+          <li>反例由你当场拍挡 / 接受<span class="why">——实验实测：没人在场 AI 一律选接受</span></li>
+          <li>审查时故意改坏实现，抽查测试会不会红<span class="why">——防测试测了个寂寞</span></li>
+          <li>worker 自报「最没把握处」，审查优先抽那里</li>
+          <li>reviewer 顺手修的每一笔都记录、你优先看</li>
+          <li>「没法验」单独列，永远不许混进「过」</li>
+          <li>规矩只写一处：constitution 是唯一出处，别处只引用</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-cap">项目里只多一个 .my-loop/ 目录</div>
+    <div class="files">
+      <div class="row"><span><span class="chip file">constitution.md</span></span><span class="desc">施工规矩的唯一出处，每个干活会话都带着。很短。</span></div>
+      <div class="row"><span><span class="chip file">decisions.jsonl</span></span><span class="desc">拍过板的决策，一条一行。带 guard + rejected 两个字段。</span></div>
+      <div class="row"><span><span class="chip file">state.json</span> <span class="chip file">tickets.json</span></span><span class="desc">进度和任务清单，机器原语。新项目直接 JSON，老项目先留 md。</span></div>
+      <div class="row"><span><span class="chip file">current/brief.md</span></span><span class="desc">这次变更的工作面：目标、验收标准、明确不做、反例表。给人和模型读的。</span></div>
+      <div class="row"><span><span class="chip file">current/review.md</span></span><span class="desc">审查报告 + reviewer 的修改清单。验收完随收尾清掉。</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-cap">V0.1 明确不做（全留给以后）</div>
+    <div class="not-doing">
+      <span>自动调度代码</span>
+      <span>并行做多条任务</span>
+      <span>自动拉起 review</span>
+      <span>adapters 适配层（Herdr + 你的手就是适配层）</span>
+      <span>config.yaml</span>
+      <span>archive 目录（git 历史就是归档）</span>
+    </div>
+  </section>
+
+  <section class="confirm">
+    <h2>请你逐条核对</h2>
+    <ol>
+      <li>四个阶段的顺序和内容，跟你脑子里的一致吗？</li>
+      <li>「人」章出现的位置——对齐点头、拍反例、施工卡住、大问题、亲手验收——多了还是少了？</li>
+      <li>右栏「我从 v2 补的」8 条，有不同意的吗？<b>有就直接说条号。</b></li>
+      <li>文件清单和「明确不做」清单，有要加减的吗？</li>
+    </ol>
+    <div class="ask">都没问题就回我「对齐了」——我马上开工写：四个阶段的提示词、constitution、决策表和进度文件的模板、Herdr 操作步骤。</div>
+  </section>
+
+  <footer>my-loop v3 · V0.1 流程确认稿 · 2026-08-26 · 给人看的版本，零黑话</footer>
+
+</div>
+</body>
+</html>

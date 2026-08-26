@@ -53,3 +53,10 @@ cp -R skills/* ~/.claude/skills/
 
 - `v3.0`（当前）：三阶段多模型协议，Herdr 人肉驱动，五 skill + 文件协议
 - `v2.1`（tag）：Claude Code 单会话 skill 形态（四步循环 + builder/auditor 子代理）
+
+## 历史证据（docs/）
+
+- `docs/experiments/` — L07 门禁对照实验（触发 7 拦截 0 → 门禁不进手册）与预注册探针
+- `docs/v3方案审读-2026-08-26.md` — v3 蓝图四镜头对抗审读报告
+- `docs/v3-流程确认-20260826.html` — 人点头过的 V0.1 流程确认稿
+- `docs/archive/reins-病类册.md` — 跨项目易错模式与疫苗配方（反例环节的现成弹药）
