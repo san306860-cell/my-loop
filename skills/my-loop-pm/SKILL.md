@@ -29,12 +29,13 @@ description: my-loop v3 总入口。项目根 CLAUDE.md 写了「本项目用 my
    - **适配规则：本体系的决策库是 `.my-loop/decisions.jsonl`。** 追问中定下来的事写进 decisions.jsonl（含 guard / rejected），**不建 docs/adr/、不写 CONTEXT.md**（项目本来就有的除外）。
    - **Unknown ≠ Assumption。** 从事实证明不了的重大歧义，不许自行补假设，必须问人。
 3. 产出**技术简报**写 `.my-loop/current/brief.md`（模板已在项目里）：
-   Goal / Definition of Done（每条带拿什么验，必含用户可感知的运行条件）/ Boundary / Constraints / Known / Unknowns / Decisions / Non-goals，**外加反例表**（边界值 / 并发与重试（含「响应丢了客户端重试」）/ 失败路径，三类各 ≥3 条）。
+   Goal / Definition of Done（每条带拿什么验，必含用户可感知的运行条件）/ Boundary / Constraints / Known / Unknowns / Decisions / Non-goals，**外加反例表**：边界值 ≥3 条 / 并发与重试 ≥3 条（含「响应丢了客户端重试」）/ **失败路径按外部操作逐个列**——这次会碰的每一个写文件、起停进程、调外部服务、连库、发网络请求，各答一句「失败或超时后停在什么终态、谁回滚」。列全靠这一次；review 抓到一处没列的失败路径，通常意味着兄弟入口全漏了。
+   预判 Simple 的，反例只写真会塌的行，不为凑数编。
 4. 【人 ①】摆出简报，反例逐条请人拍「**挡住 还是 接受**」——挡住的落成硬约束，接受的进已知限制。
    **人没说「理解对了」不往下走，不设例外。** 新拍的板当场写入 decisions.jsonl。
 5. 复杂度分类 **Simple / Medium / Big** → 【人 ②】**人确认分类才动**。
 6. 分叉：
-   - **Simple**：本会话直接做。完成定义同 worker：贴验收命令的真实输出。
+   - **Simple**：本会话直接做，不派 docs、不派 fresh review。完成定义同 worker：贴验收命令的真实输出 → 直接【人 ③】验收 → closure。触到 §0 任一风险信号的一律不算 Simple。
    - **Medium / Big**：派文档子代理（模型听人的）：「加载 `my-loop-docs`，输入 brief + 项目，产出文档、tickets.json、state.json」。产物回来抽一眼（票切得竖不竖、acceptance 可不可执行）再进 build。
 
 ## 2 build 驱动（V0.1 = 你手工驱动 Herdr，循环不是 skill 逻辑）
@@ -69,6 +70,11 @@ herdr agent start build --kind <人定的kind> --pane <上一步返回的paneID>
 1. `herdr agent list`：已有 `review` → **先退掉再拉新的**。fresh 是硬要求——验收者不许继承施工会话的上下文。
 2. 任务书 = my-loop-review 的规矩（单一出处做法同 worker）+ 输入清单：原始需求、brief、文档/契约、decisions、git diff、回执、测试输出。**不给 worker 的过程对话。**
 3. 收 `review.md` → 按 my-loop-eli5 的 Closure 格式给人一份人话报告，**第一句是结论**。
+   有 BLOCKER / MAJOR → **返工**，规矩四条：
+   - 按**缺陷类别**开返工单派回 build（你不下场改代码），单里给精确修复清单 + review 列的同类入口；回执追加写进 `receipts/rework.md`，不每轮新开文件。
+   - 修完**重新拉 fresh review**，不复用上一轮会话；复审只核销上轮清单 + 报新发现。
+   - **同类缺陷第二轮再出现 → 停。** 那不是又漏了一处，是 brief 的失败路径没列全：回 §1.3 把这类外部操作全部补齐、请人重拍，再一次修完。不许第三轮逐条补。
+   - 返工两轮仍 FAIL → 停，找人。
 4. 【人 ③】**人亲手验收**：打开真实产物看一眼、跑一遍关键操作。**人点头之前，谁也不许删任何东西。**
 5. 点头后 closure：够门槛的新决策/新坑写入 decisions.jsonl；有长期价值的文档转正；清空 `current/`（git 历史就是归档）；state.phase → `done`；给 Closure ELI5。
    人在验收里抓到 review 该抓没抓的 → **当场沉淀**成对应 skill 或 constitution 里的一条规矩，不沉淀就一直靠人兜底。
@@ -89,6 +95,16 @@ Feature 是先定义正确行为再实现；bug 是**先证明错误行为，再
 6. **所有「接受为已知限制」的判断必须过人。** Decision 只记「这个坑以后很可能重复踩」的。
 
 ## 5 初始化（新项目一次做完，不掺一行业务代码）
+
+**老项目（v2）先换血。** 两套规矩同时在场 = AI 两边都听；而且 hook 一旦看见 `decisions.jsonl` 就不再读 `DECISIONS.md`，半迁移等于老决策全部隐身。
+
+```bash
+python3 ~/.claude/skills/my-loop-pm/hooks/migrate_v2.py   # DECISIONS.md → decisions.jsonl（追加、去重），转完删 md
+```
+
+再手工：删 `CURRENT.md` / `current/scope.txt` / `scope-refresh.sh` / `completed/`（git 历史就是归档）；`CURRENT.md` 里若有进行中的变更，先并进 `state.json` + `current/brief.md` 再删；每个带 v2 触发块的 CLAUDE.md（`my-loop:trigger` 标记那段，子目录的也算）**整段换成** v3 块，不是追加。
+
+新老项目都从这里起：
 
 ```bash
 cp -Rn "${CLAUDE_SKILL_DIR}/assets/project-template/." .

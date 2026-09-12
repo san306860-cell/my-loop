@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""my-loop v3 · 老项目换血 —— 把 v2 的 DECISIONS.md 转进 decisions.jsonl，然后删掉 md
+
+为什么要一次转完：inject_decisions.py 一旦看见 jsonl 就不再读 md。
+半迁移（新决策写 jsonl、老决策留 md）= 老决策全部对会话隐身，撞上就会被顺手推翻。
+
+v2 条目长这样（一条一段）：
+
+    ## D-001 · 一句话决策 [—— 已被 D-0XX 取代]
+    2026-08-19 · 守卫: 仅文档（HANDOFF §4）
+    正文（别做什么 · 为什么）……
+
+转出来：decision=标题，reason=正文，guard 按「仅文档/结构/测试/无」映射，
+标题里写了「已被 D-0XX 取代」（不含「部分」）的标 superseded。
+jsonl 里已有的 id 跳过（jsonl 为准），其余追加到文件末尾。
+
+只用标准库。用法：
+    python3 migrate_v2.py [项目目录]     # 缺省从当前目录向上找 .my-loop/
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+from pathlib import Path
+
+HEAD_RE = re.compile(r"^## (D-\d{3,})\s*[·•]\s*(.*)$")
+SUPERSEDED_RE = re.compile(r"已被\s*(D-\d{3,})\s*取代")
+GUARD_LINE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})?\s*[·•]?\s*守卫\s*[:：]\s*(.*)$")
+GUARD_TYPES = (("仅文档", "doc"), ("结构", "structure"), ("测试", "test"), ("无", "none"))
+COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+
+
+def find_root(start: Path) -> Path | None:
+    for candidate in [start, *start.parents]:
+        if (candidate / ".my-loop").is_dir():
+            return candidate / ".my-loop"
+    return None
+
+
+def parse_guard(rest: str) -> dict:
+    rest = rest.strip()
+    for label, gtype in GUARD_TYPES:
+        if rest.startswith(label):
+            ref = rest[len(label):].strip(" ：:（）()")
+            return {"type": gtype, "ref": ref} if ref else {"type": gtype}
+    return {"type": "none", "ref": rest} if rest else {"type": "none"}
+
+
+def parse_md(text: str) -> list[dict]:
+    entries: list[dict] = []
+    current: dict | None = None
+    body: list[str] = []
+
+    def flush() -> None:
+        if current is None:
+            return
+        current["reason"] = "\n".join(body).strip() or current["decision"]
+        entries.append(current)
+
+    for line in COMMENT_RE.sub("", text).split("\n"):
+        m = HEAD_RE.match(line)
+        if m:
+            flush()
+            title = m.group(2).strip()
+            sup = SUPERSEDED_RE.search(title)
+            superseded = bool(sup) and "部分取代" not in title
+            current = {
+                "id": m.group(1),
+                "date": "",
+                "decision": title,
+                "reason": "",
+                "guard": {"type": "none"},
+                "status": "superseded" if superseded else "active",
+                "superseded_by": sup.group(1) if superseded else None,
+            }
+            body = []
+            continue
+        if line.startswith("# "):
+            flush()
+            current = None
+            continue
+        if current is None:
+            continue
+        g = GUARD_LINE_RE.match(line.strip())
+        if g and not current["date"] and not body:
+            current["date"] = g.group(1) or ""
+            current["guard"] = parse_guard(g.group(2))
+            continue
+        body.append(line)
+    flush()
+    for e in entries:
+        if not e["date"]:
+            del e["date"]
+    return entries
+
+
+def main() -> int:
+    start = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
+    root = find_root(start)
+    if root is None:
+        print(f"✗ 从 {start} 向上没找到 .my-loop/ 目录")
+        return 1
+    md = root / "DECISIONS.md"
+    if not md.is_file():
+        print("✓ 没有 DECISIONS.md，无需迁移")
+        return 0
+    jsonl = root / "decisions.jsonl"
+
+    existing: set[str] = set()
+    if jsonl.is_file():
+        for line in jsonl.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                try:
+                    existing.add(json.loads(line)["id"])
+                except Exception:  # noqa: BLE001
+                    continue
+
+    entries = parse_md(md.read_text(encoding="utf-8"))
+    if not entries:
+        print("✗ DECISIONS.md 里没解析出任何 `## D-xxx` 条目，没动任何文件")
+        return 1
+    new = [e for e in entries if e["id"] not in existing]
+    skipped = len(entries) - len(new)
+
+    with jsonl.open("a", encoding="utf-8") as f:
+        if jsonl.stat().st_size and not jsonl.read_text(encoding="utf-8").endswith("\n"):
+            f.write("\n")
+        for e in new:
+            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    md.unlink()
+
+    print(f"✓ 转入 {len(new)} 条（跳过 jsonl 已有的 {skipped} 条），已删除 {md.name}")
+    print("  接着跑 validate_state.py 核一遍；守卫标 doc/none 的老条目会被提醒裸奔，那是事实不是错误")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
