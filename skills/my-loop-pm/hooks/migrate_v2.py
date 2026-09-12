@@ -35,18 +35,13 @@ GUARD_TYPES = (("仅文档", "doc"), ("结构", "structure"), ("测试", "test")
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
 
-def find_project(start: Path) -> Path | None:
+def find_md(start: Path) -> Path | None:
+    """逐层向上找第一份真存在的 DECISIONS.md（与 inject_decisions.find_store 同一走法）。"""
     for candidate in [start, *start.parents]:
-        if any((candidate / name).is_dir() for name in DIR_NAMES):
-            return candidate
-    return None
-
-
-def find_md(project: Path) -> Path | None:
-    for name in DIR_NAMES:
-        md = project / name / "DECISIONS.md"
-        if md.is_file():
-            return md
+        for name in DIR_NAMES:
+            md = candidate / name / "DECISIONS.md"
+            if md.is_file():
+                return md
     return None
 
 
@@ -109,14 +104,11 @@ def parse_md(text: str) -> list[dict]:
 
 def main() -> int:
     start = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
-    project = find_project(start)
-    if project is None:
-        print(f"✗ 从 {start} 向上没找到 .my-loop/ 或 .reins/ 目录")
-        return 1
-    md = find_md(project)
+    md = find_md(start)
     if md is None:
-        print("✓ 没有 DECISIONS.md，无需迁移")
+        print(f"✓ 从 {start} 向上没有 DECISIONS.md，无需迁移")
         return 0
+    project = md.parent.parent
     jsonl = project / ".my-loop" / "decisions.jsonl"
 
     old_lines: list[str] = []
