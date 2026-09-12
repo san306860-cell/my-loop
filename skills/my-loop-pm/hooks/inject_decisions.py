@@ -7,7 +7,8 @@
 正是这个 hook 要解决的那个痛点本身。
 
 v3 的决策库是 `.my-loop/decisions.jsonl`（一行一条，字段见 assets/schemas/decisions.schema.json）。
-老项目的 `.my-loop/DECISIONS.md` 与 `.reins/DECISIONS.md` 继续认 —— 老项目不必迁移。
+还没换血的老项目，`.my-loop/DECISIONS.md` 与 `.reins/DECISIONS.md` 兜底；
+一旦 jsonl 出现就只读 jsonl —— 所以换血要用 migrate_v2.py 一次转完，不许两份并存。
 
 只注入 status=active 的条目。superseded 的程序过滤，不占上下文。
 守卫（guard）必须随行注入：doc/none 是裸奔条目，恰是最可能被这次会话推翻的。
