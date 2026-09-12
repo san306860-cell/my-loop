@@ -42,6 +42,8 @@ def find_md(start: Path) -> Path | None:
             md = candidate / name / "DECISIONS.md"
             if md.is_file():
                 return md
+        if (candidate / ".my-loop" / "decisions.jsonl").is_file():
+            return None  # 这一层已是纯 v3 项目，别越界去迁祖先
     return None
 
 
