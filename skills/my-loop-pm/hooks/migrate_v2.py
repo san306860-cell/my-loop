@@ -15,15 +15,18 @@ v2 条目长这样（一条一段）：
 jsonl 里已有的 id 跳过（jsonl 为准），其余追加到文件末尾。
 
 只用标准库。用法：
-    python3 migrate_v2.py [项目目录]     # 缺省从当前目录向上找 .my-loop/
+    python3 migrate_v2.py [项目目录]     # 缺省从当前目录向上找 .my-loop/ 或 .reins/
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
+
+DIR_NAMES = (".my-loop", ".reins")  # 与 inject_decisions.py 同一优先级
 
 HEAD_RE = re.compile(r"^## (D-\d{3,})\s*[·•]\s*(.*)$")
 SUPERSEDED_RE = re.compile(r"已被\s*(D-\d{3,})\s*取代")
@@ -32,10 +35,18 @@ GUARD_TYPES = (("仅文档", "doc"), ("结构", "structure"), ("测试", "test")
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
 
-def find_root(start: Path) -> Path | None:
+def find_project(start: Path) -> Path | None:
     for candidate in [start, *start.parents]:
-        if (candidate / ".my-loop").is_dir():
-            return candidate / ".my-loop"
+        if any((candidate / name).is_dir() for name in DIR_NAMES):
+            return candidate
+    return None
+
+
+def find_md(project: Path) -> Path | None:
+    for name in DIR_NAMES:
+        md = project / name / "DECISIONS.md"
+        if md.is_file():
+            return md
     return None
 
 
@@ -98,40 +109,48 @@ def parse_md(text: str) -> list[dict]:
 
 def main() -> int:
     start = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
-    root = find_root(start)
-    if root is None:
-        print(f"✗ 从 {start} 向上没找到 .my-loop/ 目录")
+    project = find_project(start)
+    if project is None:
+        print(f"✗ 从 {start} 向上没找到 .my-loop/ 或 .reins/ 目录")
         return 1
-    md = root / "DECISIONS.md"
-    if not md.is_file():
+    md = find_md(project)
+    if md is None:
         print("✓ 没有 DECISIONS.md，无需迁移")
         return 0
-    jsonl = root / "decisions.jsonl"
+    jsonl = project / ".my-loop" / "decisions.jsonl"
 
+    old_lines: list[str] = []
     existing: set[str] = set()
     if jsonl.is_file():
         for line in jsonl.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                try:
-                    existing.add(json.loads(line)["id"])
-                except Exception:  # noqa: BLE001
-                    continue
+            if not line.strip():
+                continue
+            try:
+                existing.add(json.loads(line)["id"])
+            except (json.JSONDecodeError, KeyError, TypeError):
+                print(f"✗ {jsonl} 里有解不开的行，先修好再迁：{line[:80]}")
+                return 1
+            old_lines.append(line)
 
     entries = parse_md(md.read_text(encoding="utf-8"))
     if not entries:
-        print("✗ DECISIONS.md 里没解析出任何 `## D-xxx` 条目，没动任何文件")
+        print(f"✗ {md} 里没解析出任何 `## D-xxx` 条目，没动任何文件")
         return 1
     new = [e for e in entries if e["id"] not in existing]
     skipped = len(entries) - len(new)
 
-    with jsonl.open("a", encoding="utf-8") as f:
-        if jsonl.stat().st_size and not jsonl.read_text(encoding="utf-8").endswith("\n"):
-            f.write("\n")
-        for e in new:
-            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    # 全量写临时文件再原子替换：hook 只凭 jsonl 存在与否选数据源，半成品一旦落盘就会把没写完的决策藏起来
+    jsonl.parent.mkdir(parents=True, exist_ok=True)
+    tmp = jsonl.with_name(jsonl.name + ".tmp")
+    all_lines = old_lines + [json.dumps(e, ensure_ascii=False) for e in new]
+    with tmp.open("w", encoding="utf-8") as f:
+        f.write("\n".join(all_lines) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, jsonl)
     md.unlink()
 
-    print(f"✓ 转入 {len(new)} 条（跳过 jsonl 已有的 {skipped} 条），已删除 {md.name}")
+    print(f"✓ 转入 {len(new)} 条（跳过 jsonl 已有的 {skipped} 条），已删除 {md.relative_to(project)}")
     print("  接着跑 validate_state.py 核一遍；守卫标 doc/none 的老条目会被提醒裸奔，那是事实不是错误")
     return 0
 
