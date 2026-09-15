@@ -21,7 +21,7 @@
             "description": "可执行命令或明确操作。pm 收活时逐条亲自复跑"
           },
           "depends_on": { "type": "array", "items": { "type": "string" }, "description": "真实 blocker 才记" },
-          "relevant_docs": { "type": "array", "items": { "type": "string" } },
+          "relevant_docs": { "type": "array", "items": { "type": "string" }, "description": "既有文档或代码入口路径，帮 worker 少找" },
           "domains": { "type": "array", "items": { "type": "string" }, "description": "对上 decisions 的 scope 挑相关决策" },
           "status": { "enum": ["todo", "ready", "working", "done", "blocked"] },
           "evidence": { "type": ["string", "null"], "description": "done 必填：回执文件路径" },

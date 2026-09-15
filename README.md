@@ -7,8 +7,8 @@
 
 ```
 align   需求对齐+设计   强模型追问 → 人确认技术简报（含反例表，挡/接受由人拍）
-                        → 人确认分类 → 文档 Agent 出文档/契约/竖切票/状态机
-build   快速实现        Herdr 拉 build 会话，一次一票（WIP=1）
+                        → 人确认分类 → pm 直接拆竖切票（Big 在简报上多两节：方案形状 / 测试 seam）
+build   快速实现        Herdr 拉 build 会话，一次一票（WIP=1），worker 按最简阶梯自定 HOW
                         完成 = 回执贴验收命令真实输出，pm 亲自复跑才记 done
 review  强审+沉淀       Herdr 拉全新 review 会话（不看施工过程）三 Pass 强审
                         → 人亲手验收点头 → 才沉淀决策、清理现场、出 ELI5
@@ -16,14 +16,14 @@ bug     独立旁路        diagnosing-bugs 诊断 → Bug Brief（复现+根因
 ```
 
 一条 `decisions.jsonl` 决策库贯穿全程（guard 防改回去、rejected 防决策反转），SessionStart hook 自动注入。
+没有文档阶段、没有契约文件：接口只钉 worker 改不动另一边的（对外 API / 共享 schema / 第三方回调），其余由 worker 自定、验收命令圈住。
 
 ## 结构
 
 ```
-skills/my-loop-pm/      总入口：分级、align、build/review 驱动、bug 旁路、初始化（含项目模板/schema/hooks）
-skills/my-loop-docs/    Medium/Big 文档化 + 竖切拆票
-skills/my-loop-worker/  施工规矩（非 Claude 会话由 pm 把全文贴进派工单）
-skills/my-loop-review/  强审三 Pass（含变异抽查）
+skills/my-loop-pm/      总入口：分级、align、拆票、build/review 驱动、bug 旁路、初始化（含项目模板/schema/hooks）
+skills/my-loop-worker/  施工规矩：最简阶梯（ponytail 精华）、测试红绿、回执格式（非 Claude 会话由 pm 把全文贴进派工单）
+skills/my-loop-review/  强审三 Pass（含变异抽查、收集 ponytail: 天花板标注）
 skills/my-loop-eli5/    跟人说话的两种格式（拍板 / 交付），零黑话
 ```
 
@@ -51,7 +51,8 @@ cp -R skills/* ~/.claude/skills/
 
 ## 版本
 
-- `v3.0`（当前）：三阶段多模型协议，Herdr 人肉驱动，五 skill + 文件协议
+- `v3.1`（当前）：砍掉文档阶段（pm 直接拆票、契约不定死），ponytail 最简阶梯并入 worker，constitution 只留项目特有规矩；四 skill
+- `v3.0`：三阶段多模型协议，Herdr 人肉驱动，五 skill + 文件协议
 - `v2.1`（tag）：Claude Code 单会话 skill 形态（四步循环 + builder/auditor 子代理）
 
 ## 历史证据（docs/）

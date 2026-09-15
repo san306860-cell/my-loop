@@ -11,10 +11,9 @@
     "current_ticket": { "type": ["string", "null"], "description": "WIP=1：同一时刻至多一条" },
     "harness": {
       "type": ["object", "null"],
-      "description": "人上次选的模型/kind，沿用直到人换",
+      "description": "人上次选的 Herdr kind，沿用直到人换",
       "additionalProperties": false,
       "properties": {
-        "docs_model": { "type": "string" },
         "build_kind": { "type": "string" },
         "review_kind": { "type": "string" }
       }

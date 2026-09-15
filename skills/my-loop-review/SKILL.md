@@ -6,19 +6,20 @@ description: my-loop v3 的强审规矩。全新 review 会话验收整次变更
 # my-loop-review · 强审 + 系统验收
 
 你是**全新会话**——只看产物，不看施工过程。
-输入：原始需求 · brief（含反例表）· 文档/契约 · decisions · git diff · 回执 · 测试输出。
+输入：原始需求 · brief（含反例表）· tickets · decisions · git diff · 回执 · 测试输出。
 两把尺子**分开打，不混成一个总分**：对不对（vs 需求/brief）和好不好（vs 工程标准）。
 
 ## PASS 1 · 需求与边界
 
 - 原始需求 ↔ brief ↔ 实现，三者对得上吗？有没有做 Non-goals 里的东西？
-- Boundary 漂移、契约违约、与 decisions 冲突——**守卫标 doc/none 的条目重点看**，那里没有任何东西会变红提醒。
+- Boundary 漂移、对外接口违约（brief Constraints 里钉了字段的）、与 decisions 冲突——**守卫标 doc/none 的条目重点看**，那里没有任何东西会变红提醒。
 - brief 的反例表逐条核销：人拍了「挡住」的真挡住了吗？
 
 ## PASS 2 · 代码与简单性
 
 - KISS：只有一个实现的接口、用不上的配置项、为「以后」预留的扩展点、patch accumulation、超过 3 层的链路。
 - 异常路径、并发与状态、错误数据流。回答一句：**哪三处删掉功能不变？**
+- `grep -rn "ponytail:"` 收全 worker 故意留的天花板，连同回执的 `simplified`，一起进「接受为已知限制」节——那是人的裁决。没标注却明显留了天花板的，按 MINOR 报。
 - **抓到一处，找全同类。** 发现一个失败没处理到底 / 锁没锁住 / 回滚没回滚，就把同一模式在**其他入口**上逐个过一遍（同一个外部操作的其他调用点、同一资源的其他写路径）。只报一处、下轮再报兄弟处，是 review 失职，不是 worker 失职。
 - **变异抽查 ≥3 条**：优先抽回执里的 `least_confident`，照测试注释里的【怎么算红】把实现改坏一处，看它真红吗。
   跑完还原，用 `git status` 证明工作区干净。**改坏了还绿的按 MAJOR 报——全绿不等于测了东西。**
@@ -32,7 +33,7 @@ description: my-loop v3 的强审规矩。全新 review 会话验收整次变更
 
 - **只许修五类**：漏掉的异常分支 / 明显重复 / 简单 bug / 缺一条测试 / 小范围不一致。
   每笔修改：记进 review.md 的「Reviewer 修改清单」+ 受影响测试的真实输出。**超出五类 → 打回或上报，不许扩权。**
-- **Major**（需求理解错 / 要改契约 / 方向与 SPEC 冲突 / 大量非目标工作 / 该整体推翻）→ 停，按 my-loop-eli5 的 Decision 格式摆给人。
+- **Major**（需求理解错 / 要改对外接口 / 方向与 brief 冲突 / 大量非目标工作 / 该整体推翻）→ 停，按 my-loop-eli5 的 Decision 格式摆给人。
 
 ## 输出 `.my-loop/current/review.md`
 

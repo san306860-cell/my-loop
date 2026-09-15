@@ -6,10 +6,8 @@ description: my-loop v3 总入口。项目根 CLAUDE.md 写了「本项目用 my
 # my-loop-pm · v3 总入口（PM 会话手册）
 
 **流程的钱，只花在「不做就发现不了」的地方。** 人拍全局、AI 干局部；流程全、思想全、**实现薄**。
-你（PM 会话）拿总账：对齐、分级、派活、对账、找人。实现细节不回流到你的上下文。
-
-模型与 harness 不写死：文档/worker/review 用什么模型、Herdr 用什么 kind，**听人的**；
-第一次问一句，之后记在 `.my-loop/state.json` 的 `harness` 字段里沿用。
+你（PM 会话）拿总账：对齐、分级、拆票、派活、对账、找人。实现细节不回流到你的上下文。
+build / review 用什么 Herdr kind **听人的**，第一次问一句，记进 `.my-loop/state.json` 的 `harness` 沿用。
 
 ## 0 进门先分级（分级必须说出来）
 
@@ -31,12 +29,21 @@ description: my-loop v3 总入口。项目根 CLAUDE.md 写了「本项目用 my
 3. 产出**技术简报**写 `.my-loop/current/brief.md`（模板已在项目里）：
    Goal / Definition of Done（每条带拿什么验，必含用户可感知的运行条件）/ Boundary / Constraints / Known / Unknowns / Decisions / Non-goals，**外加反例表**：边界值 ≥3 条 / 并发与重试 ≥3 条（含「响应丢了客户端重试」）/ **失败路径按外部操作逐个列**——这次会碰的每一个写文件、起停进程、调外部服务、连库、发网络请求，各答一句「失败或超时后停在什么终态、谁回滚」。列全靠这一次；review 抓到一处没列的失败路径，通常意味着兄弟入口全漏了。
    预判 Simple 的，反例只写真会塌的行，不为凑数编。
+   **接口只钉 worker 改不动另一边的**：对外 API、别的仓库或 App 端在用的、共享 DB schema、第三方回调格式——在 Constraints 里钉到字段级。仓库内部接口不定，worker 自定，acceptance 圈住。
 4. 【人 ①】摆出简报，反例逐条请人拍「**挡住 还是 接受**」——挡住的落成硬约束，接受的进已知限制。
    **人没说「理解对了」不往下走，不设例外。** 新拍的板当场写入 decisions.jsonl。
 5. 复杂度分类 **Simple / Medium / Big** → 【人 ②】**人确认分类才动**。
 6. 分叉：
-   - **Simple**：本会话直接做，不派 docs、不派 fresh review。完成定义同 worker：贴验收命令的真实输出 → 直接【人 ③】验收 → closure。触到 §0 任一风险信号的一律不算 Simple。
-   - **Medium / Big**：派文档子代理（模型听人的）：「加载 `my-loop-docs`，输入 brief + 项目，产出文档、tickets.json、state.json」。产物回来抽一眼（票切得竖不竖、acceptance 可不可执行）再进 build。
+   - **Simple**：本会话直接做，不拆票、不派 fresh review。完成定义同 worker：贴验收命令的真实输出 → 直接【人 ③】验收 → closure。触到 §0 任一风险信号的一律不算 Simple。
+   - **Medium**：你自己拆票（§1.7），进 build。
+   - **Big**：brief 再补两节——**方案形状**（动哪几块、数据怎么流，一句话级，只为让票切得一致，不是实现步骤）和**测试 seam**（在哪下测试）——然后拆票，进 build。
+7. 拆票（写 `.my-loop/tickets.json`，字段只有 `id, goal, acceptance[], depends_on, relevant_docs, domains, status`，多一个都不加）：
+   - 每条是**独立可观察的竖切**：从用户点得到的动作一路到数据落地。自检：**这条做完，人能亲眼看到什么变化？** 答不出来就是切错了。
+   - **acceptance 必须是可执行命令或明确操作**——你收活时要逐条亲自复跑。「接口返回 200」不算；「`curl -s :3000/api/invites … | jq .status` 得到 `accepted`」才算。
+   - 不写实现步骤、不写「改 foo.py 第 281 行」——那是 worker 的 HOW。`relevant_docs` 放既有文档或代码入口，帮 worker 少找。
+   - **真实 blocker 才记 `depends_on`**，别为整齐编依赖。无依赖的标 `ready`，其余 `todo`。
+   - 5±3 条；一条撑不满「人可见变化」就并进邻票。
+   - state.json：`phase` → `build`，`task` 一句话，`classification` 照分类，`current_ticket` null。跑 `python3 ~/.claude/skills/my-loop-pm/hooks/validate_state.py`，红就修到绿。
 
 ## 2 build 驱动（V0.1 = 你手工驱动 Herdr，循环不是 skill 逻辑）
 
@@ -53,8 +60,8 @@ herdr agent start build --kind <人定的kind> --pane <上一步返回的paneID>
 1. 挑 `ready` 且依赖全 `done` 的票，state.json 标 `working`。
 2. 发派工单：`herdr agent prompt build "<派工单>" --wait`。派工单**只给五样**：
    - my-loop-worker 的规矩（对方是 Claude：让它加载 `my-loop-worker`；不是：把 `~/.claude/skills/my-loop-worker/SKILL.md` 全文贴进派工单——同一份规矩，单一出处）
-   - ticket 全文 + relevant_docs 路径
-   - `.my-loop/constitution.md` 路径
+   - ticket 全文（含 relevant_docs）
+   - `.my-loop/constitution.md` 路径（项目特有规矩）
    - 相关决策**全文** + 其余 active 决策**一行标题**（保证没有决策彻底不可见）
    - 回执路径 `.my-loop/current/receipts/<id>.md`
    **不夹带实现方案**；「要可扩展 / 要健壮 / 要通用」三个词禁用。返工单例外，可给精确修复清单。
@@ -68,7 +75,7 @@ herdr agent start build --kind <人定的kind> --pane <上一步返回的paneID>
 ## 3 review 驱动（必须全新会话）
 
 1. `herdr agent list`：已有 `review` → **先退掉再拉新的**。fresh 是硬要求——验收者不许继承施工会话的上下文。
-2. 任务书 = my-loop-review 的规矩（单一出处做法同 worker）+ 输入清单：原始需求、brief、文档/契约、decisions、git diff、回执、测试输出。**不给 worker 的过程对话。**
+2. 任务书 = my-loop-review 的规矩（单一出处做法同 worker）+ 输入清单：原始需求、brief、tickets、decisions、git diff、回执、测试输出。**不给 worker 的过程对话。**
 3. 收 `review.md` → 按 my-loop-eli5 的 Closure 格式给人一份人话报告，**第一句是结论**。
    有 BLOCKER / MAJOR → **返工**，规矩四条：
    - 按**缺陷类别**开返工单派回 build（你不下场改代码），单里给精确修复清单 + review 列的同类入口；回执追加写进 `receipts/rework.md`，不每轮新开文件。
@@ -76,21 +83,21 @@ herdr agent start build --kind <人定的kind> --pane <上一步返回的paneID>
    - **同类缺陷第二轮再出现 → 停。** 那不是又漏了一处，是 brief 的失败路径没列全：回 §1.3 把这类外部操作全部补齐、请人重拍，再一次修完。不许第三轮逐条补。
    - 返工两轮仍 FAIL → 停，找人。
 4. 【人 ③】**人亲手验收**：打开真实产物看一眼、跑一遍关键操作。**人点头之前，谁也不许删任何东西。**
-5. 点头后 closure：够门槛的新决策/新坑写入 decisions.jsonl；有长期价值的文档转正；清空 `current/`（git 历史就是归档）；state.phase → `done`；给 Closure ELI5。
+5. 点头后 closure：够门槛的新决策/新坑写入 decisions.jsonl；清空 `current/`（git 历史就是归档）；state.phase → `done`；给 Closure ELI5。
    人在验收里抓到 review 该抓没抓的 → **当场沉淀**成对应 skill 或 constitution 里的一条规矩，不沉淀就一直靠人兜底。
 
 ## 4 bug 旁路（不塞进 Medium/Big）
 
 Feature 是先定义正确行为再实现；bug 是**先证明错误行为，再解释为什么错，然后做最小修复**。
 
-1. 读 bug 描述 + 相关决策/文档。
+1. 读 bug 描述 + 相关决策。
 2. 派诊断子代理：「加载 `diagnosing-bugs` 跑完整诊断循环」——先复现、建 tight feedback loop、找 first incorrect state、假设→证伪、根因。
 3. 产出 **Bug Brief** 存 `.my-loop/current/brief.md`：现象 / 可靠复现命令 / 根因 / 修复边界 / 不可破坏行为 / 回归证明。
    **回归测试必须修复前红、修复后绿，两份真实输出都要。**
 4. 分叉：
    - **local**（局部改动、不动结构）：直接派 build 修——最小根因修复，不堆 fallback、不顺手重构。修完连 Bug Brief + 红绿证据一起给人过目。
-   - **structural**（动契约/结构）：先摆给人再动。
-   - 诊断发现根本不是 bug、是契约或架构本身错了 → **升级走 §1 正常流程**。
+   - **structural**（动对外接口/结构）：先摆给人再动。
+   - 诊断发现根本不是 bug、是接口或架构本身错了 → **升级走 §1 正常流程**。
 5. 轻量 fresh review，四问：真是根因修复？有没有症状特判？破坏其他路径没有？回归测试是不是空壳？
 6. **所有「接受为已知限制」的判断必须过人。** Decision 只记「这个坑以后很可能重复踩」的。
 
@@ -114,10 +121,10 @@ cp -Rn "${CLAUDE_SKILL_DIR}/assets/project-template/." .
 ② 找到（或问人）**启动 / 测试 / 验证**三条命令，**各真跑一遍**写进 CLAUDE.md——空项目写「暂无」，不许装跑过；
 ③ 验收四条：**能启动 · 能测试 · 能看进度 · 能接手**；④ 告诉人：以后直接说需求就行，不需要打任何命令。
 
-## 6 三条铁律（从 v2 原样继承，出处即理由）
+## 6 三条铁律
 
-1. **完成 = 贴验收命令的真实输出。** 干活的自己说「做完了」不算数——你要亲自复跑。
-2. **测试要可证伪**（【测什么】【怎么算红】两行注释），review 必须改坏抽查——**全绿不等于测了东西**。
-3. **必须有人真的打开看一眼。** 自动化只能验证你想到要验证的。接管可以，**隐瞒接管不行**——替角色干了活就在决策表记一条。
+1. **完成 = 贴验收命令的真实输出**，你亲自复跑。
+2. **测试要可证伪**，review 改坏抽查——全绿不等于测了东西。
+3. **必须有人真的打开看一眼。** 接管可以，**隐瞒接管不行**——替角色干了活就在决策表记一条。
 
 > 每加一个环节先答「不做这步会漏什么」。答不上来就是仪式，删掉。手册长出仪式，把它砍回去。

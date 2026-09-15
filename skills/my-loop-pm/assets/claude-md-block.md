@@ -7,7 +7,7 @@
 - **trivial**（改文案/改常量，出错不影响别人）：直接改完，不进流程，做完提一句。
 - **其余（含 bug）**：加载 `my-loop-pm` skill，由它接管。**不要用 my-loop(v2)、dev-s、fix-s 或其他开发流程 skill。**
 
-判不准就问：这改动出错最坏会怎样？影响契约、数据、权限的一律不算 trivial。
+判不准就问：这改动出错最坏会怎样？影响对外接口、数据、权限的一律不算 trivial。
 
 进度看 `.my-loop/state.json`；拍过的板在 `.my-loop/decisions.jsonl`（SessionStart 自动注入，撞上就停下问人）。
 
