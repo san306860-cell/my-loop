@@ -27,7 +27,7 @@ bug     诊断与修复   diagnosing-bugs 建立可证伪证据 → Bug Brief �
 skills/my-loop-pm/      总入口：分级、对齐、拆票、派工对账、验收收尾、诊断旁路、初始化（含项目模板/schema/hooks）
 skills/my-loop-worker/  施工规矩：最简阶梯（ponytail 精华）、测试与证据、回执格式（宿主不支持加载时由 PM 贴全文）
 skills/my-loop-review/  审阅与验收：授权边界、变异抽查、收集 ponytail: 天花板标注、按 review_policy 收尾
-skills/my-loop-eli5/    跟用户说话的两种格式（Decision / Closure），先给结论
+skills/my-loop-eli-beginner/  收口口径：讲给软件工程初学者听——做了什么、动了哪些文件、做了哪些决策、怎么验的、还剩什么（不是独立阶段）
 ```
 
 ## 安装

@@ -22,8 +22,8 @@ ROOTS=(
   "$HOME/.gemini/config/skills"   # gemini
 )
 
-CURRENT=(my-loop-pm my-loop-worker my-loop-review my-loop-eli5)
-RETIRED=(my-loop-docs)            # v3.2 砍掉独立文档阶段，装到哪清到哪
+CURRENT=(my-loop-pm my-loop-worker my-loop-review my-loop-eli-beginner)
+RETIRED=(my-loop-docs my-loop-eli5)  # 退役的，装到哪清到哪
 
 for root in "${ROOTS[@]}"; do
   echo "→ $root"
