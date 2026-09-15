@@ -54,6 +54,31 @@ def check_state(state: dict, tickets_by_id: dict, errors: list[str], warns: list
             errors.append(f"✗ state.current_ticket 指向不存在的票 {cur}")
         elif t.get("status") != "working":
             errors.append(f"✗ state.current_ticket={cur}，但那张票的状态是「{t.get('status')}」不是 working")
+    policy = state.get("review_policy")
+    if "review_policy" not in state:
+        if state.get("phase") in {"review", "awaiting_acceptance", "done"}:
+            errors.append("✗ 旧状态进入验收或交付前须补录 review_policy；可复用已有明确选择，不重复审批")
+        else:
+            warns.append("⚠ 旧状态尚无 review_policy；进入验收前记录用户的验收方式和标准")
+    elif policy is None:
+        if state.get("phase") in {"review", "awaiting_acceptance", "done"}:
+            errors.append("✗ 进入验收或交付前须记录用户选择的 review_policy")
+    elif not isinstance(policy, dict):
+        errors.append("✗ review_policy 必须是对象或 null")
+    else:
+        if policy.get("mode") not in ("notify", "self"):
+            errors.append("✗ review_policy.mode 必须是 notify 或 self")
+        acceptance = policy.get("acceptance")
+        if not isinstance(acceptance, list) or not acceptance or not all(isinstance(a, str) and a.strip() for a in acceptance):
+            errors.append("✗ review_policy.acceptance 必须包含本任务的具体验收标准")
+    evidence = state.get("review_evidence")
+    if evidence is not None and (not isinstance(evidence, str) or not evidence.strip()):
+        errors.append("✗ review_evidence 必须是非空回执路径或 null")
+    if state.get("phase") == "done":
+        if any(t.get("status") != "done" for t in tickets_by_id.values()):
+            errors.append("✗ 仍有未完成的票，不能将本次任务标为 done")
+        if not evidence:
+            errors.append("✗ 交付完成须填写 review_evidence，记录所验产物和验收结果")
 
 
 def check_tickets(tickets: list, errors: list[str], warns: list[str]) -> dict:
@@ -162,6 +187,13 @@ def main() -> int:
     state = load_json(root / "state.json", errors)
     if isinstance(state, dict):
         check_state(state, by_id, errors, warns)
+        evidence = state.get("review_evidence")
+        if state.get("phase") == "done" and isinstance(evidence, str) and evidence.strip():
+            evidence_path = Path(evidence).expanduser()
+            if not evidence_path.is_absolute():
+                evidence_path = root.parent / evidence_path
+            if not evidence_path.is_file():
+                errors.append(f"✗ review_evidence 指向不存在的文件：{evidence}")
 
     check_decisions(root / "decisions.jsonl", errors, warns)
 

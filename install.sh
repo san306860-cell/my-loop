@@ -23,7 +23,7 @@ ROOTS=(
 )
 
 CURRENT=(my-loop-pm my-loop-worker my-loop-review my-loop-eli5)
-RETIRED=(my-loop-docs)            # v3.1 砍掉，装到哪清到哪
+RETIRED=(my-loop-docs)            # v3.2 砍掉独立文档阶段，装到哪清到哪
 
 for root in "${ROOTS[@]}"; do
   echo "→ $root"

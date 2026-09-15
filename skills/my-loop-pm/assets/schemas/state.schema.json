@@ -11,13 +11,42 @@
     "current_ticket": { "type": ["string", "null"], "description": "WIP=1：同一时刻至多一条" },
     "harness": {
       "type": ["object", "null"],
-      "description": "人上次选的 Herdr kind，沿用直到人换",
+      "description": "用户指定的工具、环境及模型选择，适用时沿用；未指定模型沿用宿主当前设置",
       "additionalProperties": false,
       "properties": {
+        "runtime": { "type": "string", "description": "用户指定的执行环境或工具，例如当前宿主或 Herdr" },
         "build_kind": { "type": "string" },
         "review_kind": { "type": "string" }
       }
     },
-    "updated": { "type": ["string", "null"], "description": "YYYY-MM-DD" }
-  }
+    "updated": { "type": ["string", "null"], "description": "YYYY-MM-DD" },
+    "review_policy": {
+      "type": ["object", "null"],
+      "description": "用户指定的本任务验收方式和标准；未选择时为 null",
+      "required": ["mode", "acceptance"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "enum": ["notify", "self"] },
+        "acceptance": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "review_evidence": {
+      "type": ["string", "null"],
+      "description": "最终验收回执路径；记录所验产物、逐项证据，notify 模式含用户通过反馈"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "required": ["phase"], "properties": { "phase": { "enum": ["review", "awaiting_acceptance", "done"] } } },
+      "then": { "required": ["review_policy"], "properties": { "review_policy": { "type": "object" } } }
+    },
+    {
+      "if": { "required": ["phase"], "properties": { "phase": { "const": "done" } } },
+      "then": { "required": ["review_evidence"], "properties": { "review_evidence": { "type": "string", "minLength": 1 } } }
+    }
+  ]
 }

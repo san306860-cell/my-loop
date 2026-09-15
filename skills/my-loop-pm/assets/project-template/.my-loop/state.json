@@ -4,5 +4,7 @@
   "classification": null,
   "current_ticket": null,
   "harness": null,
-  "updated": null
+  "updated": null,
+  "review_policy": null,
+  "review_evidence": null
 }

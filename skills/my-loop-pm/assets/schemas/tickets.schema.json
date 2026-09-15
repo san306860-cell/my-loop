@@ -2,30 +2,83 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "my-loop v3 · tickets.json",
   "type": "object",
-  "required": ["tickets"],
+  "required": [
+    "tickets"
+  ],
   "additionalProperties": false,
   "properties": {
     "tickets": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "goal", "acceptance", "depends_on", "status"],
+        "required": [
+          "id",
+          "goal",
+          "acceptance",
+          "depends_on",
+          "status"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string", "pattern": "^T-\\d{3,}$" },
-          "goal": { "type": "string", "description": "一条独立可观察的竖切：做完人能看到什么变化" },
+          "id": {
+            "type": "string",
+            "pattern": "^T-\\d{3,}$"
+          },
+          "goal": {
+            "type": "string",
+            "description": "一条独立可观察、可验证的行为或技术结果"
+          },
           "acceptance": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string" },
-            "description": "可执行命令或明确操作。pm 收活时逐条亲自复跑"
+            "items": {
+              "type": "string"
+            },
+            "description": "可执行命令或明确操作及预期结果；PM 核对真实证据，按需要补验"
           },
-          "depends_on": { "type": "array", "items": { "type": "string" }, "description": "真实 blocker 才记" },
-          "relevant_docs": { "type": "array", "items": { "type": "string" }, "description": "既有文档或代码入口路径，帮 worker 少找" },
-          "domains": { "type": "array", "items": { "type": "string" }, "description": "对上 decisions 的 scope 挑相关决策" },
-          "status": { "enum": ["todo", "ready", "working", "done", "blocked"] },
-          "evidence": { "type": ["string", "null"], "description": "done 必填：回执文件路径" },
-          "blocked_reason": { "type": ["string", "null"] }
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "真实 blocker 才记"
+          },
+          "relevant_docs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "既有文档或代码入口路径，帮 worker 少找"
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "对上 decisions 的 scope 挑相关决策"
+          },
+          "status": {
+            "enum": [
+              "todo",
+              "ready",
+              "working",
+              "done",
+              "blocked"
+            ]
+          },
+          "evidence": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "done 必填：回执文件路径"
+          },
+          "blocked_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         }
       }
     }
