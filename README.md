@@ -30,7 +30,7 @@ skills/my-loop-eli5/    跟人说话的两种格式（拍板 / 交付），零�
 ## 安装
 
 ```bash
-cp -R skills/* ~/.claude/skills/
+./install.sh   # 装到本机所有 agent 的 skill 区（公用区 + codex/pi/dsh/devin/cursor/mirasim/gemini），幂等
 ```
 
 `~/.claude/settings.json` 注册 hook（同时兼容 v2 老项目的 DECISIONS.md）：
