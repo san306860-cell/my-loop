@@ -36,7 +36,11 @@ done
 
 # ~/.claude/skills 用软链指向公用区（Claude Code 原本就是这个约定，保持不变）。
 CL="$HOME/.claude/skills"
-if [ -d "$CL" ] && [ -z "$DRY" ]; then
+# 若 ~/.claude/skills 本身就软链到公用区（整个目录是同一处），上面已经装好，不能再逐个建链——
+# 否则会先删掉刚装的目录，再建出指向自己的死循环软链。
+if [ -d "$CL" ] && [ -z "$DRY" ] && [ "$(cd "$CL" && pwd -P)" = "$(cd "$HOME/.agents/skills" && pwd -P)" ]; then
+  echo "→ $CL 已是公用区本身，跳过"
+elif [ -d "$CL" ] && [ -z "$DRY" ]; then
   echo "→ $CL (软链 → ~/.agents/skills)"
   for s in "${RETIRED[@]}"; do rm -rf "${CL:?}/$s"; done
   for s in "${CURRENT[@]}"; do rm -rf "${CL:?}/$s"; ln -s "$HOME/.agents/skills/$s" "$CL/$s"; done

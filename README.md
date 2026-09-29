@@ -43,6 +43,8 @@ skills/my-loop-eli-beginner/  收口口径：讲给软件工程初学者听—�
   "command": "python3 ~/.claude/skills/my-loop-pm/hooks/inject_decisions.py" } ] } ] } }
 ```
 
+改了 hooks 或 install.sh 后跑一遍回归测试（只用标准库）：`python3 -m unittest discover tests`
+
 按需依赖（来自 [mattpocock/skills](https://github.com/mattpocock/skills)）：`grilling`、`domain-modeling`、`research`、`diagnosing-bugs`。
 用 Herdr 派工时另需 `herdr` skill；只用当前宿主则不需要。
 

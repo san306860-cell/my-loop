@@ -143,6 +143,9 @@ def check_decisions(path: Path, errors: list[str], warns: list[str]) -> None:
         except Exception as e:  # noqa: BLE001
             errors.append(f"✗ decisions.jsonl 第 {i} 行不是合法 JSON：{e}")
             continue
+        if not isinstance(d, dict):
+            errors.append(f"✗ decisions.jsonl 第 {i} 行必须是 JSON 对象")
+            continue
         entries.append(d)
         for field in ("id", "decision", "reason", "status"):
             if not d.get(field):
@@ -179,12 +182,19 @@ def main() -> int:
     warns: list[str] = []
 
     tickets_doc = load_json(root / "tickets.json", errors)
-    tickets = tickets_doc.get("tickets", []) if isinstance(tickets_doc, dict) else []
-    if tickets_doc is not None and not isinstance(tickets_doc.get("tickets"), list):
+    tickets = tickets_doc.get("tickets") if isinstance(tickets_doc, dict) else None
+    if tickets_doc is not None and not isinstance(tickets, list):
         errors.append("✗ tickets.json 顶层必须是 {\"tickets\": [...]}")
+    if not isinstance(tickets, list):
+        tickets = []
+    if not all(isinstance(t, dict) for t in tickets):
+        errors.append("✗ tickets.json 里每张票都必须是对象")
+        tickets = [t for t in tickets if isinstance(t, dict)]
     by_id = check_tickets(tickets, errors, warns)
 
     state = load_json(root / "state.json", errors)
+    if state is not None and not isinstance(state, dict):
+        errors.append("✗ state.json 顶层必须是对象")
     if isinstance(state, dict):
         check_state(state, by_id, errors, warns)
         evidence = state.get("review_evidence")

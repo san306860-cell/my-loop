@@ -35,17 +35,21 @@ COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 GUARD_LABEL = {"structure": "结构", "test": "测试", "doc": "仅文档", "none": "无"}
 
 
-def find_store(start: Path) -> tuple[Path, str] | None:
-    """从当前目录逐级向上找决策库。新 jsonl 优先，老 md 兜底。"""
+def find_stores(start: Path) -> list[tuple[Path, str]]:
+    """从当前目录逐级向上，找到第一层有决策库的目录，返回该层全部候选：新 jsonl 优先，老 md 兜底。
+    初始化老项目会复制一份空 jsonl —— 只认 jsonl 就会把老 DECISIONS.md 静默丢掉，所以同层都要列出来。"""
     for candidate in [start, *start.parents]:
+        found: list[tuple[Path, str]] = []
         jsonl = candidate / ".my-loop" / "decisions.jsonl"
         if jsonl.is_file():
-            return jsonl, "jsonl"
+            found.append((jsonl, "jsonl"))
         for name in DIR_NAMES:
             md = candidate / name / "DECISIONS.md"
             if md.is_file():
-                return md, "md"
-    return None
+                found.append((md, "md"))
+        if found:
+            return found
+    return []
 
 
 # ---------- jsonl（v3） ----------
@@ -132,23 +136,20 @@ def condense_md(text: str) -> str:
 def main() -> int:
     try:
         start = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path.cwd()).resolve()
-        found = find_store(start)
-        if found is None:
-            return 0
-        path, kind = found
-
-        if kind == "jsonl":
-            body = render_jsonl(path)
-            if not body:
-                return 0  # 一条 active 决策都没有 —— 静默，空的要显示空
-            if len(body) > FULL_TEXT_LIMIT:
-                body = condense_jsonl(body)
-        else:
-            body = decisions_only(path.read_text(encoding="utf-8"))
-            if not body:
-                return 0
-            if len(body) > FULL_TEXT_LIMIT:
-                body = condense_md(body)
+        body = ""
+        for path, kind in find_stores(start):
+            if kind == "jsonl":
+                body = render_jsonl(path)
+                if body and len(body) > FULL_TEXT_LIMIT:
+                    body = condense_jsonl(body)
+            else:
+                body = decisions_only(path.read_text(encoding="utf-8"))
+                if body and len(body) > FULL_TEXT_LIMIT:
+                    body = condense_md(body)
+            if body:
+                break
+        if not body:
+            return 0  # 一条 active 决策都没有 —— 静默，空的要显示空
 
         try:
             rel = str(path.relative_to(start))
