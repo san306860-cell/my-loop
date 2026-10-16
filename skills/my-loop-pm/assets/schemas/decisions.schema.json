@@ -8,11 +8,12 @@
     "id": { "type": "string", "pattern": "^D-\\d{3,}$" },
     "date": { "type": "string", "description": "YYYY-MM-DD" },
     "decision": { "type": "string", "description": "一句话：定了什么 + 别做什么" },
+    "source": { "type": "string", "minLength": 1, "description": "新记录注明来源与依据，例如用户决定、项目约束或 PM 授权内工程选择；旧记录缺省表示来源未单列，不能推定用户确认" },
     "reason": { "type": "string", "description": "为什么。少了它，下次会被当成口味偏好绕开" },
     "rejected": { "type": "string", "description": "否决过什么方案、为什么——防下个会话把它重新发明出来（决策反转）" },
     "guard": {
       "type": "object",
-      "description": "这条靠什么防住被无意改回去。doc/none = 裸奔，最容易被下次会话推翻",
+      "description": "这条如何被保护。代码可破坏的行为约束按风险选择结构或测试；产品选择、术语、授权等可只用文档记录",
       "required": ["type"],
       "additionalProperties": false,
       "properties": {

@@ -1,69 +1,86 @@
 # my-loop v3
 
-自用的一套开发 workflow，跑在当前宿主或 Herdr + 多家 agent CLI（claude / codex / gemini / agy / pi / dsh…）上。
-**用户定目标与验收，PM 管证据，执行者定实现** —— 规矩全部在文件和提示词里，零调度代码。
+一套可在当前宿主或多 Agent 环境中使用的开发工作流。用户定目标与验收，PM 管目标和证据，worker 负责实现，reviewer 核对实际产物。
 
-## 闭环
+## 怎么用
 
-```
-align   对齐与准备   明确 Goal/DoD/Boundary/Constraints/反例 → 记 brief
-                     → 问一次验收方式（notify / self）记进 review_policy
-                     → PM 直接拆票（Big 在 brief 多两节：方案形状 / 测试边界）
-build   实施与对账   一次一票（WIP=1），worker 按最简阶梯自定 HOW
-                     回执给真实证据，PM 逐条核对才记 done
-accept  验收与收尾   notify → 等用户 review；self → PM 按 my-loop-review 组织审阅
-                     必需标准全过 + review_evidence 落地，才算交付完成
-bug     诊断与修复   diagnosing-bugs 建立可证伪证据 → Bug Brief → 根因修复
-```
+新任务直接说「用 my-loop 帮我做……」。项目 `AGENTS.md` 已声明使用 my-loop 时，之后可直接说需求。已有授权、验收方式和工具选择继续沿用，只补问会影响目标、关键行为或授权的缺失信息。
 
-一条 `decisions.jsonl` 决策库贯穿全程（guard 防改回去、rejected 防决策反转），SessionStart hook 自动注入。
-项目规则以 `AGENTS.md` 为准，`CLAUDE.md` 只留一行兼容引用，不维护第二份正文。
-没有独立文档阶段、没有另造的契约文件：接口只钉 worker 改不动另一边的（对外 API / 共享 schema / 第三方回调），其余由 worker 选择、acceptance 与既有代码约束。
-`validate_state.py` 是机器闸门：进验收前没 `review_policy`、标 done 没 `review_evidence` 或还有票没完成，一律红。
+简单任务可在当前会话完成，不强制创建整套状态文件。需要持续派工的任务使用 brief、tickets、实施回执和 review；没有额外的方法论打卡阶段。
 
-## 结构
+| 环节 | 工作与依据 |
+|---|---|
+| 对齐与设计 | PM 明确目标、边界和验收；按问题使用 Release It!、DDIA、PoEAA。关键决定互相依赖时，使用 Wayfinder 的本地适配梳理 |
+| 实现 | Worker 固定使用 Code Complete、A Philosophy of Software Design 和项目规则；回执把关键选择关联到代码位置、理由和验证依据 |
+| 技术核对 | Reviewer 固定使用 Refactoring，沿代码、调用链和检查结果核对 worker 的主张；「已读」或笼统的「测试通过」不代替证据 |
+| 最终验收 | `notify` 和 `self` 都先做必要技术核对；前者等用户验收，后者由 PM 按已定标准验收 |
 
-```
-skills/my-loop-pm/      总入口：分级、对齐、拆票、派工对账、验收收尾、诊断旁路、初始化（含项目模板/schema/hooks）
-skills/my-loop-worker/  施工规矩：最简阶梯（ponytail 精华）、测试与证据、回执格式（宿主不支持加载时由 PM 贴全文）
-skills/my-loop-review/  审阅与验收：授权边界、变异抽查、收集 ponytail: 天花板标注、按 review_policy 收尾
-skills/my-loop-eli-beginner/  收口口径：讲给软件工程初学者听——做了什么、动了哪些文件、做了哪些决策、怎么验的、还剩什么（不是独立阶段）
-```
+方法论通常先读 mini，需要时再查完整规则。简洁按理解、修改和验证的总成本判断，不按最少行数或文件数打分。多个方法可以共用一条实际约束和证据。
 
-## 安装
+TasteSkill v2 按需用于网页视觉与交互设计；图片、动效数量不作为通用验收标准。Wayfinder 的原版保留供单独调用，PM 使用 [本地适配](skills/my-loop-pm/references/wayfinder.md)。完整分工见 [方法论路由](skills/my-loop-pm/references/methodology-routing.md)。这些 Skill 也可以单独点名使用。
+
+## 安装与更新
+
+需要 Bash 和 Python 3.10+。仓库包含 13 个 Skill：四个 my-loop 角色、六套书籍方法论、TasteSkill v2、Wayfinder、适配后的 Ponytail；安装不需要临时下载依赖。
 
 ```bash
-./install.sh   # 装到本机所有 agent 的 skill 区（公用区 + codex/pi/dsh/devin/cursor/mirasim/gemini），幂等
+./install.sh --dry-run  # 预览
+./install.sh            # 安装或同步当前 checkout
+./install.sh --check    # 检查正文和链接是否与当前 checkout 一致
 ```
 
-`~/.claude/settings.json` 注册 hook（老项目的 `DECISIONS.md` 继续认，不必迁移）：
+更新已安装版本时，先将此仓库更新到希望使用的提交，再运行 `./install.sh`。
+
+运行时正文统一存放在 `~/.agents/skills/<name>/`。Codex、Claude 及检测到的已安装宿主使用指向它的链接；仓库 `skills/` 是可版本管理、可复现的分发快照。以后修改共享正文，所有兼容入口同时读到同一份内容；发布这些修改时再同步回仓库。
+
+| 宿主 | 兼容入口 |
+|---|---|
+| Codex / Claude | `~/.codex/skills`、`~/.claude/skills`；同时支持当前 `CODEX_HOME/skills` |
+| Cursor | `~/.cursor/skills` |
+| Pi | `~/.pi/agent/skills` |
+| Devin | `~/.config/devin/skills`、`~/.config/cognition/skills` |
+| Dsh | `~/.dsh/skills` |
+| agy / Antigravity CLI | `~/.gemini/config/skills` |
+| Kiro | `~/.kiro/skills` |
+| WorkBuddy / CodeBuddy | 各自的 `~/.workbuddy/skills`、`~/.codebuddy/skills` |
+
+可选宿主按已有配置目录识别。旧版本创建的 `~/.pi/skills`、`~/.devin/skills`、`~/.mirasim/skills` 若仍存在，也转为链接，避免留下旧副本；这不表示所有旧路径都被当前宿主加载。整目录已链接共享区时不会再次创建自环链接。
+
+替换前，原有目录、链接及退役的 `my-loop-docs` / `my-loop-eli5` 会移至 `~/.agents/backups/my-loop/<时间-编号>/`，`manifest.json` 记录原位置。无关 Skill 不变；重复运行无差异时不重写、不新增备份。`--dry-run` 和 `--check` 都不写文件。`--home <目录>` 可在独立目录验证安装，不改当前用户的安装。
+
+文件同步不等于已经替换旧会话内读过的上下文。新任务会读取新入口；已有会话需要重新加载 Skill 或新开会话。Kiro CLI 自定义 Agent 还应保留默认资源继承；项目私有 Skill 或自定义搜索路径由该项目配置决定。
+
+## 项目状态与决策
+
+项目规则以 `AGENTS.md` 为准，`CLAUDE.md` 只作兼容引用。决策集中记录在 `.my-loop/decisions.jsonl`；新记录用 `source` 区分用户决定、项目约束和授权内工程选择，旧记录不推定已获用户确认。空 JSONL 不会遮住同层旧版 `DECISIONS.md`。
+
+`validate_state.py` 检查阶段、WIP、依赖和验收方式；完成票及最终验收的回执必须是可读、非空的文件。文件检查不证明内容真实或覆盖充分，reviewer 仍需核对。
+
+Claude Code 可在 `~/.claude/settings.json` 注册现有 SessionStart hook（安装器不改 hook 配置）：
 
 ```json
 { "hooks": { "SessionStart": [ { "hooks": [ { "type": "command",
   "command": "python3 ~/.claude/skills/my-loop-pm/hooks/inject_decisions.py" } ] } ] } }
 ```
 
-改了 hooks 或 install.sh 后跑一遍回归测试（只用标准库）：`python3 -m unittest discover tests`
+按需辅助工具 `grilling`、`domain-modeling`、`research`、`diagnosing-bugs` 来自 [mattpocock/skills](https://github.com/mattpocock/skills)，不在此分发包内。使用 Herdr 派工时另需 `herdr`；仅用当前宿主不需要它。
 
-按需依赖（来自 [mattpocock/skills](https://github.com/mattpocock/skills)）：`grilling`、`domain-modeling`、`research`、`diagnosing-bugs`。
-用 Herdr 派工时另需 `herdr` skill；只用当前宿主则不需要。
+## 验证与来源
 
-## 用法
+```bash
+python3 -m unittest discover tests -v
+```
 
-1. 开一个会话跑 pm（当前宿主或 Herdr 格子都行，PM 会问一次）
-2. 项目里说一句「初始化 my-loop」（每项目一次，写进 `AGENTS.md`）
-3. 之后直接说需求。PM 会问一次这次怎么验收（notify / self），之后同类任务沿用
+回归测试只用标准库，覆盖共享安装、旧副本备份、重复安装、目录别名、决策来源、旧决策兼容、回执文件和状态校验。安装测试在临时目录运行。
 
-## 版本
+上游版本与本地适配的区别见 [SOURCES.md](SOURCES.md)。六套书籍 Skill 是仓库作者整理的工程规则，不是原书全文或原作者官方 Skill。
 
-- `v3.2`（当前）：合并 AGENTS.md 路线与 `review_policy` 验收协议（notify / self）+ 机器闸门；砍掉独立文档阶段（PM 直接拆票、内部接口不定死）；ponytail 最简阶梯并入 worker；constitution 只留项目特有约束。四 skill
-- `v3.1`（未发布，已并入 v3.2）：砍文档阶段 + ponytail 并入
-- `v3.0`：三阶段多模型协议，Herdr 人肉驱动，五 skill + 文件协议
-- `v2.1`（tag）：Claude Code 单会话 skill 形态（四步循环 + builder/auditor 子代理）
+## 版本与历史证据
 
-## 历史证据（docs/）
+- 2026-10-16：接入六套方法论、TasteSkill v2、Wayfinder；落实实现证据与评审核对；合并来源与回执校验修复；统一共享安装和兼容链接。
+- v3.2：AGENTS.md 路线与 `review_policy` 协议；PM 直接拆票；收口内置 `my-loop-eli-beginner`。
+- v3.1（并入 v3.2）：移除独立文档阶段，Ponytail 的复用顺序并入 worker。
+- v3.0：多模型协议与文件交接。
+- v2.1（tag）：Claude Code 单会话的四步循环。
 
-- `docs/experiments/` — L07 门禁对照实验（触发 7 拦截 0 → 门禁不进手册）与预注册探针
-- `docs/v3方案审读-2026-08-26.md` — v3 蓝图四镜头对抗审读报告
-- `docs/v3-流程确认-20260826.html` — 人点头过的 V0.1 流程确认稿
-- `docs/archive/reins-病类册.md` — 跨项目易错模式与疫苗配方（反例环节的现成弹药）
+`docs/experiments/` 保留早期 L07 实验，`docs/` 中的旧方案和审读记录用于查历史，不代表当前规则。

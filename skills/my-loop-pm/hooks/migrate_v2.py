@@ -145,7 +145,7 @@ def main() -> int:
     md.unlink()
 
     print(f"✓ 转入 {len(new)} 条（跳过 jsonl 已有的 {skipped} 条），已删除 {md.relative_to(project)}")
-    print("  接着跑 validate_state.py 核一遍；守卫标 doc/none 的老条目会被提醒裸奔，那是事实不是错误")
+    print("  接着跑 validate_state.py 核一遍；旧记录来源未单列时查原记录，不推定用户确认，也不强制补测试")
     return 0
 
 

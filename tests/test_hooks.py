@@ -85,7 +85,7 @@ class Install(Tmp):
         (home / ".agents" / "skills").mkdir(parents=True)
         (home / ".claude").mkdir()
         (home / ".claude" / "skills").symlink_to(home / ".agents" / "skills")
-        r = run(["bash", REPO / "install.sh"], env={**os.environ, "HOME": str(home)})
+        r = run(["bash", REPO / "install.sh", "--home", str(home)])
         self.assertEqual(r.returncode, 0, r.stderr)
         skill = home / ".claude" / "skills" / "my-loop-pm" / "SKILL.md"
         self.assertTrue(skill.is_file())
@@ -94,7 +94,7 @@ class Install(Tmp):
     def test_separate_claude_skills_dir_gets_per_skill_links(self) -> None:
         home = self.dir
         (home / ".claude" / "skills").mkdir(parents=True)
-        r = run(["bash", REPO / "install.sh"], env={**os.environ, "HOME": str(home)})
+        r = run(["bash", REPO / "install.sh", "--home", str(home)])
         self.assertEqual(r.returncode, 0, r.stderr)
         link = home / ".claude" / "skills" / "my-loop-pm"
         self.assertTrue(link.is_symlink())

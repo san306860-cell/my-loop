@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""my-loop v3 · SessionStart hook —— 把「已经拍过板的决策」塞进每次会话的开头
+"""my-loop v3 · SessionStart hook —— 把已有决策及其来源带入会话
 
 为什么必须是 hook 而不是一句「记得去读决策表」：
 指针靠模型自觉，而自觉在上下文变长之后是第一个失效的东西 ——
@@ -10,7 +10,7 @@ v3 的决策库是 `.my-loop/decisions.jsonl`（一行一条，字段见 assets/
 老项目的 `.my-loop/DECISIONS.md` 与 `.reins/DECISIONS.md` 继续认 —— 老项目不必迁移。
 
 只注入 status=active 的条目。superseded 的程序过滤，不占上下文。
-守卫（guard）必须随行注入：doc/none 是裸奔条目，恰是最可能被这次会话推翻的。
+来源（source）与保护方式（guard）随行注入；来源缺失不代表人类批准。
 
 契约（Claude Code hooks）：退出码 0 + stdout 一份 JSON，
 `hookSpecificOutput.additionalContext` 里的文字模型能看到。
@@ -25,7 +25,7 @@ import os
 import re
 from pathlib import Path
 
-# 超过这个字数就压缩成骨架（id·决策·守卫）。上限不是省钱，是防挤占：
+# 超过这个字数就压缩成骨架（id·决策·来源·守卫），保持来源可见：
 # 全灌进去等于把最要紧的那几条埋了。
 FULL_TEXT_LIMIT = 6000
 
@@ -36,8 +36,7 @@ GUARD_LABEL = {"structure": "结构", "test": "测试", "doc": "仅文档", "non
 
 
 def find_stores(start: Path) -> list[tuple[Path, str]]:
-    """从当前目录逐级向上，找到第一层有决策库的目录，返回该层全部候选：新 jsonl 优先，老 md 兜底。
-    初始化老项目会复制一份空 jsonl —— 只认 jsonl 就会把老 DECISIONS.md 静默丢掉，所以同层都要列出来。"""
+    """返回最近一层的候选；空 jsonl 不能遮住同层的旧 Markdown 决策。"""
     for candidate in [start, *start.parents]:
         found: list[tuple[Path, str]] = []
         jsonl = candidate / ".my-loop" / "decisions.jsonl"
@@ -54,7 +53,7 @@ def find_stores(start: Path) -> list[tuple[Path, str]]:
 
 # ---------- jsonl（v3） ----------
 
-def render_jsonl(path: Path) -> str:
+def render_jsonl(path: Path, compact: bool = False) -> str:
     """active 条目渲染成给模型看的块。坏行静默跳过 —— 钩子没资格让会话报错。"""
     blocks: list[str] = []
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -65,13 +64,15 @@ def render_jsonl(path: Path) -> str:
             d = json.loads(line)
         except Exception:  # noqa: BLE001
             continue
-        if d.get("status") != "active":
+        if not isinstance(d, dict) or d.get("status") != "active":
             continue
         head = f"{d.get('id', 'D-???')} · {d.get('decision', '').strip()}"
-        parts: list[str] = []
-        if d.get("reason"):
+        source = d.get("source")
+        source = " ".join(source.split()) if isinstance(source, str) and source.strip() else "未单列；需查原记录，不能推定用户确认"
+        parts = [f"来源: {source}"]
+        if not compact and d.get("reason"):
             parts.append(f"为什么: {d['reason']}")
-        if d.get("rejected"):
+        if not compact and d.get("rejected"):
             parts.append(f"否决过: {d['rejected']}")
         parts.append(render_guard(d.get("guard")))
         if d.get("scope"):
@@ -82,22 +83,10 @@ def render_jsonl(path: Path) -> str:
 
 def render_guard(guard: dict | None) -> str:
     if not isinstance(guard, dict):
-        return "守卫: 无 ⚠裸奔"
+        return "守卫: 未记录"
     gtype = GUARD_LABEL.get(guard.get("type", "none"), "无")
     ref = f" {guard['ref']}" if guard.get("ref") else ""
-    naked = " ⚠裸奔" if guard.get("type") in (None, "doc", "none") else ""
-    return f"守卫: {gtype}{ref}{naked}"
-
-
-def condense_jsonl(text: str) -> str:
-    """太长只留骨头：标题行 + 守卫。守卫必须留 —— 裸奔的那几条正是最可能被推翻的。"""
-    kept: list[str] = []
-    for block in text.split("\n\n"):
-        lines = block.split("\n")
-        head = lines[0] if lines else ""
-        guard = next((p.strip() for p in lines[1].split("｜") if "守卫" in p), "") if len(lines) > 1 else ""
-        kept.append(f"{head} ｜ {guard}".rstrip(" ｜"))
-    return "\n".join(kept)
+    return f"守卫: {gtype}{ref}"
 
 
 # ---------- md（v2 兼容，逻辑原样保留） ----------
@@ -127,7 +116,7 @@ def decisions_only(text: str) -> str:
 
 
 def condense_md(text: str) -> str:
-    keep_prefixes = ("## ", "**决定**", "决定:", "**守卫**", "守卫:", "**不这么做会怎样**")
+    keep_prefixes = ("## ", "**决定**", "决定:", "决定：", "**来源**", "来源:", "来源：", "**守卫**", "守卫:", "守卫：", "**不这么做会怎样**")
     return "\n".join(s for line in text.split("\n") if (s := line.strip()).startswith(keep_prefixes))
 
 
@@ -141,7 +130,7 @@ def main() -> int:
             if kind == "jsonl":
                 body = render_jsonl(path)
                 if body and len(body) > FULL_TEXT_LIMIT:
-                    body = condense_jsonl(body)
+                    body = render_jsonl(path, compact=True)
             else:
                 body = decisions_only(path.read_text(encoding="utf-8"))
                 if body and len(body) > FULL_TEXT_LIMIT:
@@ -149,7 +138,7 @@ def main() -> int:
             if body:
                 break
         if not body:
-            return 0  # 一条 active 决策都没有 —— 静默，空的要显示空
+            return 0
 
         try:
             rel = str(path.relative_to(start))
@@ -157,14 +146,14 @@ def main() -> int:
             rel = str(path)
 
         context = (
-            f"以下是这个项目**已经由人拍过板的决策**，来自 {rel}。\n"
+            f"以下是这个项目已记录的决策，来自 {rel}；按来源和当前授权适用，不能把所有记录都当作用户批准。\n"
             "给建议、写代码、选方案之前先对一遍：\n"
             "  · 与已决事项一致 → 直接照做，不要重新讨论一遍\n"
-            "  · 与已决事项冲突 → 先核对当前明确用户决定是否已解决；否则说明具体冲突，请人裁决，只等待受影响的部分\n"
+            "  · 与已决事项冲突 → 先核对来源和当前明确授权；可逆工程选择在范围内调整，只有尚未决定的目标、关键行为或授权冲突才请用户决定\n"
             "  · 当前明确决定取代旧记录时注明来源；不把未确认假设记录成人已拍板\n"
+            "  · 来源未单列的旧记录按来源未知处理，需要时查原记录；不推定用户确认，也不批量要求重新审批\n"
             "  · 「否决过」那一栏是防止你把否决过的方案重新发明出来的\n"
-            "  · 守卫标着「仅文档」或「无」（⚠裸奔）的条目最脆弱：没有测试或结构兜底，\n"
-            "    你一旦改动相关代码，没有任何东西会变红来提醒你\n"
+            "  · 只有代码可破坏的行为约束才按实际风险检查结构或测试保护；产品选择、术语和授权记录可以只用文档，不为每条决定补造测试\n"
             "  · 文档以最新内容为准（人可以手改），你读到的这份就是最新的\n\n"
             f"{body}\n"
         )

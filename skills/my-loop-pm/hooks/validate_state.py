@@ -42,6 +42,23 @@ def load_json(path: Path, errors: list[str]):
     return None
 
 
+def check_evidence_file(value, label: str, project: Path, errors: list[str]) -> None:
+    """校验回执能被实际读取；内容真假与覆盖程度仍由审阅者判断。"""
+    if not isinstance(value, str) or not value.strip():
+        errors.append(f"✗ {label} 必须是非空回执文件路径")
+        return
+    try:
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            path = project / path
+        if not path.is_file():
+            errors.append(f"✗ {label} 指向不存在的文件或目录：{value}")
+        elif not path.read_text(encoding="utf-8").strip():
+            errors.append(f"✗ {label} 指向空白回执：{value}")
+    except (OSError, UnicodeError, ValueError, RuntimeError) as exc:
+        errors.append(f"✗ {label} 回执无法读取：{value}（{exc}）")
+
+
 def check_state(state: dict, tickets_by_id: dict, errors: list[str], warns: list[str]) -> None:
     if state.get("phase") not in PHASES:
         errors.append(f"✗ state.phase「{state.get('phase')}」不在合法值里：{sorted(PHASES)}")
@@ -150,6 +167,8 @@ def check_decisions(path: Path, errors: list[str], warns: list[str]) -> None:
         for field in ("id", "decision", "reason", "status"):
             if not d.get(field):
                 errors.append(f"✗ decisions.jsonl 第 {i} 行缺必填字段「{field}」")
+        if "source" in d and (not isinstance(d["source"], str) or not d["source"].strip()):
+            errors.append(f"✗ decisions.jsonl 第 {i} 行 source 须为明确来源的非空文字；旧记录可不填")
         did = str(d.get("id", ""))
         if did and not DECISION_ID.match(did):
             errors.append(f"✗ 决策号「{did}」不符合 D-001 形式")
@@ -161,8 +180,6 @@ def check_decisions(path: Path, errors: list[str], warns: list[str]) -> None:
         g = d.get("guard")
         if g is not None and (not isinstance(g, dict) or g.get("type") not in GUARD_TYPES):
             errors.append(f"✗ {did} 的 guard 不合法（type 必须是 structure/test/doc/none）")
-        elif d.get("status") == "active" and (g is None or g.get("type") in ("doc", "none")):
-            warns.append(f"⚠ {did} 守卫裸奔（仅文档/无）——能不能补一条会红的测试？")
     for d in entries:
         sb = d.get("superseded_by")
         if sb and sb not in ids:
@@ -191,6 +208,9 @@ def main() -> int:
         errors.append("✗ tickets.json 里每张票都必须是对象")
         tickets = [t for t in tickets if isinstance(t, dict)]
     by_id = check_tickets(tickets, errors, warns)
+    for tid, ticket in by_id.items():
+        if ticket.get("status") == "done" and ticket.get("evidence"):
+            check_evidence_file(ticket["evidence"], f"{tid} evidence", root.parent, errors)
 
     state = load_json(root / "state.json", errors)
     if state is not None and not isinstance(state, dict):
@@ -199,11 +219,7 @@ def main() -> int:
         check_state(state, by_id, errors, warns)
         evidence = state.get("review_evidence")
         if state.get("phase") == "done" and isinstance(evidence, str) and evidence.strip():
-            evidence_path = Path(evidence).expanduser()
-            if not evidence_path.is_absolute():
-                evidence_path = root.parent / evidence_path
-            if not evidence_path.is_file():
-                errors.append(f"✗ review_evidence 指向不存在的文件：{evidence}")
+            check_evidence_file(evidence, "review_evidence", root.parent, errors)
 
     check_decisions(root / "decisions.jsonl", errors, warns)
 
